@@ -1,1 +1,3 @@
-/home/rapela/dev/research/programs/src/R/math/tr.R
+tr <- function(m) {
+    return(sum(diag(m)))
+}

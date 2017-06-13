@@ -1,1 +1,3 @@
-/home/rapela/dev/research/programs/src/R/math/l2Norm2.R
+l2Norm2 <- function(x) {
+    return(sum(x^2))
+}

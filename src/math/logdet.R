@@ -1,1 +1,4 @@
-/home/rapela/dev/research/programs/src/R/math/logdet.R
+logdet <- function(m) {
+    return(2*sum(log(diag(chol(m)))))
+}
+
