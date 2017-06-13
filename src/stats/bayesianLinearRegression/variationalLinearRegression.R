@@ -1,0 +1,1 @@
+/home/rapela/dev/research/programs/src/R/stats/bayesianLinearRegression/variationalLinearRegression.R
