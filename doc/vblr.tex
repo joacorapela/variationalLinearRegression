@@ -1,0 +1,387 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[hypertexnames=false,colorlinks=true,breaklinks]{hyperref}
+\usepackage{natbib}
+\usepackage{amsmath,amsthm}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{url}
+
+
+\floatname{algorithm}{Listing}
+\newtheorem{lemmaQWTau}{Lemma}
+\newtheorem{corollaryETauWTW}{Corollary}[lemmaQWTau]
+\newtheorem{lemmaQAlpha}[lemmaQWTau]{Lemma}
+
+\newlength\mystoreparindent
+\newenvironment{myparindent}[1]{%
+\setlength{\mystoreparindent}{\the\parindent}
+\setlength{\parindent}{#1}
+}{%
+\setlength{\parindent}{\mystoreparindent}
+}
+
+\title{Derivation of a Variational-Bayes Linear Regression Algorithm using a
+Normal Inverse-Gamma Generative Model}
+
+\author{Joaqu\'{i}n Rapela}
+
+\begin{document}
+
+\maketitle
+
+\abstract{
+
+Here we give a brief introduction to variational inference, derive a
+variational-Bayes linear regression algorithm using a normal inverse-gamma
+generative model, and provide R sourced code implementing this algorithm.
+
+}
+
+\section{Introduction}
+
+Section~\ref{sec:variationalInference} summarizes key concepts of variational
+inference and Section~\ref{sec:vblr} uses these concepts to derive a
+variational-Bayes linear regression algorithm using a Normal Inverse-Gamma
+generative model. This derivation builds on that of
+\citet[][Chapter~10]{bishop06}.  For simplicity, the generative model in the
+latter derivation assumes the variance of the likelihood function is known and
+fixed to its true value. The generative model used below does not make such
+simplifying assumption and uses the more general generative model in
+\citet{drugowitsch14}. The derivations given here contain more details than
+those in \citet{drugowitsch14}.
+
+\section{Summary of Variational Inference}
+\label{sec:variationalInference}
+
+The variational inference framework is based on the following easy to check
+equations:
+
+\begin{align}
+\ln p(\mathbf{x})&=\mathcal{L}(q)+KL(q||p)\nonumber\\
+\mathcal{L}(q)&=\int
+q(\mathbf{z})\ln\left\{\frac{p(\mathbf{x},\mathbf{z})}{q(\mathbf{z})}\right\}d\mathbf{z}\nonumber\\
+KL(q||p)&=-\int
+q(\mathbf{z})\ln\left\{\frac{p(\mathbf{z}|\mathbf{x})}{q(\mathbf{z})}\right\}d\mathbf{z}\nonumber
+\end{align}
+
+We want to find values of the latent variable $\mathbf{z}$ that maximizes the
+posterior probability $p(\mathbf{z}|\mathbf{x})$ given an observable variable
+$\mathbf{x}$.
+%
+Computing $p(\mathbf{z}|\mathbf{x})$ is challenging, so we are going to
+approximate it with a density $q(\mathbf{z})$. We seek the density
+$q^*(\mathbf{z})$ that minimizes the Kullback-Leibler divergence $KL(q||p)$
+between $q(\mathbf{z})$ and $p(\mathbf{z}|\mathbf{x})$ over all possible $q$'s.
+However, we don't want to minimize the $KL$ divergence directly because for
+this we need $p(\mathbf{z}|\mathbf{x})$, which is difficult to compute. Instead
+we maximize $\mathcal{L}(q)$ over all possible distribution $q$, which is
+easier since computing $p(\mathbf{x},\mathbf{z})$ is simpler. 
+
+As shown in \citet[][Eq. 10.9]{bishop06}, if we take a factorization
+
+\begin{align}
+q(\mathbf{z})=\Pi_{i=1}^Mq_i(\mathbf{z}_i)
+\end{align}
+
+\noindent and we keep ${q_{i\ne j}}$ fixed, then the $q^*_j$ that maximizes
+$\mathcal{L}(q)$ is
+
+\begin{align}
+\ln q^*_j(\mathbf{z_j})=E_{i\ne j}\{\ln p(\mathbf{x},\mathbf{z})\} + \text{const.}
+\label{eq:variationalSolution}
+\end{align}
+
+\section{Variational-Bayes Linear Regression}
+\label{sec:vblr}
+
+We use the following generative linear regression model:
+
+\begin{align}
+p(\mathbf{y},\mathbf{w},\tau,\Phi,\alpha)&=p(\mathbf{y}|\Phi,\mathbf{w},\tau)\;p(\mathbf{w},\tau|\alpha)\;p(\alpha)\label{eq:generativeJoint}\\
+p(\mathbf{y}|\Phi,\mathbf{w},\tau)&=N(\mathbf{y}|\Phi\mathbf{w},\tau^{-1}I)\label{eq:generativeLikelihood}\\
+p(\mathbf{w},\tau|\alpha)&=N(\mathbf{w}|\mathbf{0},(\tau\alpha)^{-1}I)\;\text{Gam}(\tau|a_0,b_0)\label{eq:generativeWTauGivenAlpha}\\
+p(\alpha)&=\text{Gam}(\alpha|c_o,d_0)\label{eq:generativeAlpha}
+\end{align}
+
+\noindent where $\mathbf{y}\in\Re^N$ and $\mathbf{w}\in\Re^D$ are the dependent
+variable and weights of the linear regression
+model, respectively, $\tau$ is the precision of $\mathbf{y}$, $\Phi$ is the
+matrix of independent observations and $\alpha$ influences the precision of the
+prior on the weights.
+%
+We assume that $q$ factorizes as
+
+\begin{align}
+q(\mathbf{w},\tau,\alpha)=q(\mathbf{w},\tau)\;q(\alpha)\label{eq:qFactorization}
+\end{align}
+
+\noindent and from Eq.~\ref{eq:variationalSolution} we obtain
+
+\begin{align}
+\ln q^*(\mathbf{w},\tau)&=E_\alpha\{\ln
+p(\mathbf{y},\mathbf{w},\tau,\Phi,\alpha)\}+\text{const.}\label{eq:lnQWTau}\\
+\ln q^*(\alpha)&=E_{\mathbf{w},\tau}\{\ln p(\mathbf{y},\mathbf{w},\tau,\Phi,\alpha)\}+\text{const.}\label{eq:lnQAlpha}
+\end{align}
+
+By calculating the expectation in the right-hand side of Eq.~\ref{eq:lnQWTau},
+Lemma~\ref{lemma:qWTau} shows that
+
+\begin{align}
+q^*(\mathbf{w},\tau)=N(\mathbf{w}|\mathbf{m}_N,S_N)\;\text{Gam}(\tau|a_N,b_N)\label{eq:qWTau}
+\end{align}
+
+\noindent with 
+
+\begin{align}
+\mathbf{m}_N&=V_N\Phi^T\mathbf{y}\label{eq:m_N}\\
+S_N^{-1}&=\tau V_N^{-1}\label{eq:S_N}\\
+V_N&=(\Phi^T\Phi+E_\alpha\{\alpha\}I)^{-1}\nonumber\\
+a_N&=a_0+N/2\label{eq:a_N}\\
+b_N&=b_0+\frac{1}{2}(||\mathbf{y}-\Phi\mathbf{m}_N||^2+E_\alpha\{\alpha\}||\mathbf{m}_N||^2)\label{eq:b_N}
+\end{align}
+
+\noindent and Corollary~\ref{corollary:eTauWTW} proves
+
+\begin{align}
+E_{\mathbf{w},\tau}\{\tau||\mathbf{w}||^2\}&=\text{trace}\{V_N\}+||\mathbf{m}_N||^2\;a_N/b_N\label{eq:eTauW2}
+\end{align}
+
+By calculating the expectation in the right-hand side of Eq.~\ref{eq:lnQAlpha},
+Lemma~\ref{lemma:qAlpha} shows that
+
+\begin{align}
+q^*(\alpha)=\text{Gam}(\alpha|c_N,d_N)\label{eq:qAlpha}
+\end{align}
+
+\noindent with 
+
+\begin{align}
+c_N&=c_0+D/2\label{eq:c_N}\\
+d_N&=d_0+\frac{E_{\mathbf{w},\tau}\{\tau||\mathbf{w}||^2\}}{2\label{eq:d_N}}
+\end{align}
+
+\noindent and from Eq.~\ref{eq:qAlpha} it follows
+
+\begin{align}
+E_\alpha\{\alpha\}=\frac{c_N}{d_N}\nonumber
+\end{align}
+
+It is remarkable that from only the generative model in
+Eq.~\ref{eq:generativeJoint}-\ref{eq:generativeAlpha} and from the
+factorization of $q$ in Eq.~\ref{eq:qFactorization} we can derive the
+parametrized close-form solution of the density $q(\mathbf{z})$ best
+approximating the posterior density $p(\mathbf{z}|\mathbf{x})$. To find the
+optimal parameters of $q$ we proceed iteratively, as shown in
+Listing~\ref{listing:vblrAlgorithm}.
+
+\begin{algorithm}
+\caption{Variational-Bayes Linear Regression algorithm}
+\label{listing:vblrAlgorithm}
+
+\begin{algorithmic}[1]
+\REQUIRE $\mathbf{y}, \Phi, a_0, b_0, c_0, d_0, \text{maxIter}$
+\STATE $N\leftarrow\text{nrow}(\Phi)$
+\STATE $D\leftarrow\text{ncol}(\Phi)$
+\STATE $\text{converged}\leftarrow\text{False}$
+\STATE $\text{eAlpha}\leftarrow c_0/d_0$
+\STATE $a_N\leftarrow a_0+N/2$
+\STATE $c_N\leftarrow c_0+D/2$
+\STATE $b_N\leftarrow b_0, d_N\leftarrow d_0$
+\STATE $\text{lowerBound}\leftarrow -\text{largeNumber}$
+\STATE $\text{iter}\leftarrow 1$
+\FOR{$\text{iter}=1:\text{maxIter}$}
+    \STATE $V_N\leftarrow(\Phi^T\Phi+\text{eAlpha}\;I_D)^{-1}$
+    \STATE $m_N\leftarrow V_N\Phi^T\mathbf{y}$
+    \STATE $\text{oldLowerBound}\leftarrow\text{lowerBound}$
+    \STATE $\text{lowerBound}\leftarrow\text{computeLowerBound}()$
+    \IF{$\text{lowerBound}-\text{oldLowerBound}<\epsilon$}
+        \STATE $\text{converged}\leftarrow\text{True}$
+        \STATE $\text{break}$
+    \ENDIF
+    \STATE $b_N\leftarrow b_0+\frac{1}{2}(||\mathbf{y}-\Phi\mathbf{m}_N||^2+\text{eAlpha}||\mathbf{m}_N||^2)$
+    \STATE $\text{eTauWTW2}\leftarrow \text{trace}\{V_N\}+||\mathbf{m}_N||^2a_N/b_N$
+    \STATE $d_N\leftarrow d_0+\frac{\text{eTauWTW2}}{2}$
+    \STATE $\text{eAlpha}\leftarrow c_N/d_N$
+\ENDFOR
+\RETURN{$\mathbf{m}_N, V_N, a_N, b_N, c_N, d_N,\text{converged}$}
+\end{algorithmic}
+\end{algorithm}
+
+\section{Source code}
+
+\begin{flushleft}
+R code implementing the algorithm in Listing~\ref{listing:vblrAlgorithm}
+appears at\\
+\url{https://github.com/joacorapela/variationalLinearRegression}\\
+\end{flushleft}
+
+\bibliographystyle{apalike}
+\bibliography{machineLearning}
+
+\appendix
+
+\section{Proofs}
+
+\begin{lemmaQWTau}
+\label{lemma:qWTau}
+For the generative model in Eqs.~\ref{eq:generativeJoint}-\ref{eq:generativeAlpha}, the parametrized close-form
+expression of $q^*(\mathbf{w},\tau)$ in Eq.~\ref{eq:qFactorization} is given in
+Eq.~\ref{eq:qWTau}.
+\end{lemmaQWTau}
+
+\begin{myparindent}{0pt}
+\begin{proof}
+
+\begin{align}
+\ln q^*(\mathbf{w},\tau)&=E_{\alpha}\{\ln p(\mathbf{y},\mathbf{w},\tau,\Phi,\alpha)\}+\text{const.}\nonumber\\
+&=\ln p(\mathbf{y}|\Phi,\mathbf{w},\tau)+E_{\alpha}\{\ln p(\mathbf{w},\tau|\alpha)\}+\text{const.}\label{eq:lnQWTauExpaned}
+\end{align}
+
+The first equality is Eq.~\ref{eq:lnQWTau} and the second one follows from
+Eq.~\ref{eq:generativeJoint} by keeping only terms that depend on $\mathbf{w}$
+and $\tau$. 
+
+From Eq.~\ref{eq:generativeLikelihood}
+
+\begin{align}
+p(\mathbf{y}|\Phi,\mathbf{w},\tau)=&\frac{\tau^{N/2}}{(2\pi)^{N/2}}\exp\left(-\frac{\tau}{2}||\mathbf{y}-\Phi\mathbf{w}||^2\right)\nonumber
+\end{align}
+
+then
+
+\begin{align}
+\ln p(\mathbf{y}|\Phi,\mathbf{w},\tau)=&\frac{N}{2}\ln\tau-\frac{\tau}{2}||\mathbf{y}-\Phi\mathbf{w}||^2+\text{const.}\label{eq:likelihoodExpanded}
+\end{align}
+
+where $\text{const.}$ groups all terms that do not depend on
+$\mathbf{w}$ or $\tau$. 
+
+From Eq.~\ref{eq:generativeWTauGivenAlpha}
+
+\begin{align}
+p(\mathbf{w},\tau|\alpha)=&\frac{\tau^{D/2}\alpha^{D/2}}{(2\pi)^{D/2}}\exp\left(-\frac{1}{2}\tau\alpha||\mathbf{w}||^2\right)\nonumber\\
+&\frac{1}{\Gamma(a_0)}b_0^{a_0}\tau^{a_0-1}\exp(-b_0\tau)\label{eq:pWTauGivenAlpha}
+\end{align}
+
+then
+
+\begin{align}
+E_\alpha\{\ln(p(\mathbf{w},\tau|\alpha)\}=&\left(\frac{D}{2}+(a_0-1)\right)\ln\tau\nonumber\\
+                              &-\left(\frac{||\mathbf{w}||^2}{2}E_\alpha\{\alpha\}+b_0\right)\tau+\text{const.}\label{eq:eWRTAlphaLnPWTau}
+\end{align}
+
+Replacing Eqs.~\ref{eq:likelihoodExpanded} and~\ref{eq:eWRTAlphaLnPWTau} into
+Eq.~\ref{eq:lnQWTauExpaned} we obtain
+
+\begin{align}
+ \ln q^*(\mathbf{w},\tau)=&\left(\frac{N}{2}+(a_0-1)+\frac{D}{2}\right)\ln\tau\nonumber\\
+                          &-\frac{1}{2}\tau\left(||\mathbf{y}-\Phi\mathbf{w}||^2+E_\alpha\{\alpha\}||\mathbf{w}||^2\right)\nonumber\\
+                          &-b_0\tau + \text{const.}\label{eq:lnQWTauExpansion1}
+\end{align}
+
+Completing squares on the second term of Eq.~\ref{eq:lnQWTauExpansion1} and
+re-arranging we obtain
+
+\begin{align}
+\ln q^*(\mathbf{w},\tau)={}&\left((a_0-1)+\frac{N}{2}\right)\ln\tau\nonumber\\
+&-\frac{\tau}{2}\left(||\mathbf{y}-\Phi\mathbf{m}_N||^2+E_\alpha\{\alpha\}||m_N||^2+2b_0\right)\nonumber\\
+&-\frac{1}{2}(\mathbf{w}-\mathbf{m}_N)^TS_N^{-1}(\mathbf{w}-\mathbf{m}_N)\nonumber\\
+&+\frac{D}{2}\ln\tau+\text{const.}\label{eq:lnQWTauExpansionLast}
+\end{align}
+
+with $\mathbf{m}_N$ and $S_N$ given in Eqs.~\ref{eq:m_N}
+and~\ref{eq:S_N}, respectively. Defining $a_N$ and $b_N$ as in
+Eqs.~\ref{eq:a_N} and~\ref{eq:b_N}, respectively, from
+Eq.~\ref{eq:lnQWTauExpansionLast} we obtain
+
+\begin{align}
+\ln q^*(\mathbf{w},\tau))=\ln N(\mathbf{w}|\mathbf{m}_N,S_N)\;\text{Gam}(\tau|a_N,b_N)\nonumber
+\end{align}
+
+\end{proof}
+\end{myparindent}
+
+\begin{corollaryETauWTW}
+Given $q^*(\mathbf{w},\tau)$ in Eq.~\ref{eq:qWTau},
+$E_{\mathbf{w},\tau}\left\{\tau||\mathbf{w}||^2\right\}$ is given in
+Eq.~\ref{eq:eTauW2}
+\label{corollary:eTauWTW}
+\end{corollaryETauWTW}
+
+\begin{myparindent}{0pt}
+\begin{proof}
+
+\begin{align}
+E_{\mathbf{w},\tau}\left\{\tau||\mathbf{w}||^2\right\}=&\int\tau\int\ldots\int||\mathbf{w}||^2q^*(\mathbf{w},\tau)\;d\mathbf{w}d\tau\nonumber\\
+=&\int\tau\;\text{Gam}(\tau|a_N,b_N)\left(\int\ldots\int||\mathbf{w}||^2N(\mathbf{w}|\mathbf{m}_N,S_N)\;d\mathbf{m}_N\right)\;d\tau\nonumber\\
+=&\int\tau\;\text{Gam}(\tau|a_N,b_N)E_\mathbf{w}\left\{||\mathbf{w}||^2\right\}\;d\tau\label{eq:eTauWTWFinal}
+\end{align}
+
+Next we derive $E_\mathbf{w}\left\{||\mathbf{w}||^2\right\}$
+
+\begin{align}
+E_\mathbf{w}\left\{||\mathbf{w}||^2\right\}&=\text{trace}\left\{\text{cor}(\mathbf{w})\right\}\nonumber\\
+&=\text{trace}\left\{cov(\mathbf{w})+E\{\mathbf{w}\}E\{\mathbf{w}\}^T\right\}\nonumber\\
+&=\text{trace}\left\{cov(\mathbf{w})\right\}+E\{\mathbf{w}\}^TE\{\mathbf{w}\}\nonumber\\
+&=\text{trace}\left\{S_N\right\}+\mathbf{m}_n^T\mathbf{m}_N\nonumber\\
+&=\tau^{-1}\text{trace}\left\{V_N\right\}+||\mathbf{m}_N||^2\label{eq:eWTW}
+\end{align}
+
+Inserting Eq.~\ref{eq:eWTW} into Eq.~\ref{eq:eTauWTWFinal} and integrating
+gives Eq.~\ref{eq:eTauW2}.
+\end{proof}
+\end{myparindent}
+
+\begin{lemmaQAlpha}
+\label{lemma:qAlpha}
+For the generative model in Eqs.~\ref{eq:generativeJoint}-\ref{eq:generativeAlpha}, the parametrized close-form
+expression of $q^*(\alpha)$ in Eq.~\ref{eq:qFactorization} is given in
+Eq.~\ref{eq:qAlpha}.
+\end{lemmaQAlpha}
+
+\begin{myparindent}{0pt}
+\begin{proof}
+\begin{align}
+\ln q^*(\alpha)&=E_{\mathbf{w},\tau}\{\ln p(\mathbf{y},\mathbf{w},\tau,\Phi,\alpha)\}+\text{const.}\nonumber\\
+&=E_{\mathbf{w},\tau}\{\ln p(\mathbf{w},\tau|\alpha)\}+\ln p(\alpha)+\text{const.}\label{eq:lnQAlphaExpaned}
+\end{align}
+
+The first equality is Eq.~\ref{eq:lnQAlpha} and the second one follows from
+Eq.~\ref{eq:generativeJoint} by keeping only terms that depend on $\alpha$. 
+
+From Eq.~\ref{eq:pWTauGivenAlpha}
+
+\begin{align}
+E_{\mathbf{w},\tau}\{\ln
+p(\mathbf{w},\tau|\alpha)\}=&\frac{D}{2}\ln\alpha-\frac{\alpha}{2}E_{\mathbf{w},\tau}\{\tau||\mathbf{w}||^2\}+\text{const.}\label{eq:eWRTWTauLnPWTau}
+\end{align}
+
+From Eq.~\ref{eq:generativeAlpha}
+
+\begin{align}
+p(\alpha)=&\frac{1}{\Gamma(c_0)}d_0^{c_0}\alpha^{c_0-1}\exp(-d_0\alpha)\nonumber
+\end{align}
+
+then
+
+\begin{align}
+\ln p(\alpha)=&(c_0-1)\ln\alpha-d_0\alpha+\text{const.}\label{eq:lnPAlpha}
+\end{align}
+
+Replacing Eqs.~\ref{eq:eWRTWTauLnPWTau} and~\ref{eq:lnPAlpha} into
+Eq.~\ref{eq:lnQAlphaExpaned} we obtain
+
+\begin{align}
+\ln
+q^*(\alpha))={}&\left(c_0+\frac{D}{2}-1\right)\ln\alpha-\left(\frac{E_{\mathbf{w},\tau}\{\tau||\mathbf{w}||^2\}}{2}\}+d_0\right)\alpha+\text{const.}\nonumber\\
+={}&\text{Gam}(\alpha|c_N,d_N)\nonumber
+\end{align}
+
+with $c_N$ and $d_N$ given in Eqs.~\ref{eq:c_N} and~\ref{eq:d_N},
+respectively.
+\end{proof}
+\end{myparindent}
+
+\end{document}
