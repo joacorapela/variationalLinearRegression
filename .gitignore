@@ -1,0 +1,4 @@
+doc/*
+!doc/vblr.pdf
+!doc/vblr.tex
+!doc/Makefile
